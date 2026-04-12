@@ -1,55 +1,71 @@
-"""Smoke test: mse-ai consumes mse-cli substrate cleanly."""
+"""Smoke tests: mse-ai substrate boundary is clean and callable."""
 
 from __future__ import annotations
 
-from mse_ai.baseline_demo import build_demo_training_matrix, run_demo_baseline
-from mse_ai.signal_demo import build_demo_records, run_demo_signal_backtest
 from mse_ai.substrate import (
+    MSEClient,
     OHLCVRecord,
     build_feature_catalog_surface,
     build_signal_backtest_payload,
+    build_training_dataset_manifest,
     build_walk_forward_split_plan,
+    detect_momentum,
+    detect_price_anomalies,
     detect_volume_anomalies,
     fit_baseline_model,
 )
 
 
-def test_substrate_imports_resolve():
+def test_substrate_boundary_imports_resolve():
+    """Every re-exported symbol must be callable."""
+    assert callable(MSEClient)
     assert callable(fit_baseline_model)
     assert callable(build_feature_catalog_surface)
     assert callable(build_walk_forward_split_plan)
     assert callable(build_signal_backtest_payload)
+    assert callable(build_training_dataset_manifest)
     assert callable(detect_volume_anomalies)
+    assert callable(detect_price_anomalies)
+    assert callable(detect_momentum)
 
 
-def test_demo_training_matrix_is_canonical_shape():
-    matrix = build_demo_training_matrix()
-    assert matrix["schema_version"] == "training_matrix.v1"
-    assert matrix["surface_id"] == "model.training_matrix"
-    assert matrix["target_field"] == "fwd_return_5d"
-    assert len(matrix["rows"]) == 8
-    assert len(matrix["feature_columns"]) == 2
+def test_ohlcv_record_type_available():
+    """The canonical trade record type must be importable."""
+    assert OHLCVRecord is not None
 
 
-def test_demo_baseline_emits_canonical_fit_contract():
-    fit = run_demo_baseline()
-    assert fit["schema_version"] == "baseline_model_fit.v1"
-    assert fit["surface_id"] == "model.baseline_fit"
-    assert fit["model_kind"] == "logistic_binary"
-    assert "model_params" in fit
-    assert "evaluation" in fit
-    assert "lineage" in fit
+def test_feature_catalog_is_live():
+    """The credential-free feature catalog must return a canonical payload."""
+    client = MSEClient()
+    try:
+        payload = client.research_feature_catalog()
+    finally:
+        client.close()
+    assert payload["schema_version"] == "feature_catalog.v1"
+    assert len(payload.get("surfaces", [])) > 0
 
 
-def test_demo_records_are_canonical_ohlcv():
-    records = build_demo_records(symbol="APU")
-    assert len(records) == 21
-    assert all(isinstance(r, OHLCVRecord) for r in records)
-    assert records[0].symbol == "APU"
+def test_label_catalog_is_live():
+    """The credential-free label catalog must return a canonical payload."""
+    client = MSEClient()
+    try:
+        payload = client.research_label_catalog()
+    finally:
+        client.close()
+    assert payload["schema_version"] == "label_catalog.v1"
+    assert payload["summary"]["surface_count"] > 0
 
 
-def test_demo_signal_backtest_emits_canonical_contract():
-    payload = run_demo_signal_backtest(symbol="APU")
-    assert payload["schema_version"] == "signal_backtest.v1"
-    assert payload.get("symbol") == "APU"
-    assert "timeline" in payload or "rows" in payload or "events" in payload
+def test_strategy_baseline_catalog_is_live():
+    """The credential-free strategy baseline catalog must list strategies."""
+    client = MSEClient()
+    try:
+        payload = client.research_strategy_baseline_catalog()
+    finally:
+        client.close()
+    assert payload["schema_version"] == "strategy_baseline_catalog.v1"
+    assert payload["strategy_count"] > 0
+    for s in payload["strategies"]:
+        assert s["deterministic"] is True
+        assert s["credential_free"] is True
+        assert s["point_in_time_safe"] is True
