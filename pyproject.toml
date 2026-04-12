@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "mse-ai"
 version = "0.1.0"
-description = "Deterministic ML consumer built on the mse-cli feature/label/dataset substrate"
+description = "Deterministic ML + alpha research consumer built on the mse-cli substrate"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [{name = "MSE Ecosystem"}]
-keywords = ["mse", "ml", "deterministic", "baseline", "walk-forward"]
+keywords = ["mse", "ml", "deterministic", "baseline", "walk-forward", "alpha", "signal", "backtest"]
 
 dependencies = [
     "mse-cli>=1.2.0",
