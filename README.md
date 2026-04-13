@@ -1,38 +1,43 @@
 # mse-ai
 
-Deterministic ML + alpha research consumer built **on top of** the `mse-cli` foundation substrate.
+Deterministic ML and signal research for the Mongolian Stock Exchange — built on `mse-cli`.
 
-## Architectural boundary
-
-- `mse-ai` is a **downstream consumer** of `mse-cli`.
-- `mse-ai` does **not** redefine foundation contracts.
-- `mse-ai` imports canonical substrate from `mse_cli.core.*` via `substrate.py`:
-  - **ML**: `feature_catalog`, `model_baselines`, `walk_forward_splits`
-  - **Alpha/Signal**: `signal_engine`, `signal_alpha`, `signal_backtest`
-  - **Data**: `OHLCVRecord` (canonical trade model)
-- `mse-ai` produces models, predictions, evaluation reports, alpha signals, and backtest payloads.
-- All outputs are **deterministic, credential-free, point-in-time safe** (inherited from `mse-cli` substrate).
+All outputs are **deterministic, credential-free, and point-in-time safe**.
 
 ## Install
 
 ```bash
-pip install -e .
+pip install mse-ai
 ```
 
-## Smoke test
+## Commands
 
 ```bash
+mse-ai signal APU              # 5-detector signal backtest on APU
+mse-ai signal GOBI             # Same for GOBI
+mse-ai baseline APU            # Fit logistic baseline model on APU
+```
+
+## Capabilities
+
+| Command | What it does |
+|---------|-------------|
+| `signal` | Runs 5 detectors (volume anomaly, price anomaly, momentum, accumulation/distribution, turnover liquidity) on real trade history |
+| `baseline` | Fits a logistic binary baseline model on real training matrix from mse-cli |
+
+## Architecture
+
+`mse-ai` is a downstream consumer of [`mse-cli`](https://pypi.org/project/mse-cli/). It imports canonical ML substrate:
+
+- `fit_baseline_model` — deterministic model fitting
+- `build_signal_backtest_payload` — signal evaluation
+- `detect_*` — 5 signal detectors
+- `build_walk_forward_split_plan` — walk-forward cross-validation
+- `MSEClient` — real market data (no demo data)
+
+## Development
+
+```bash
+pip install -e ".[dev]"
 pytest -q
 ```
-
-## Run demos
-
-```bash
-mse-ai baseline          # Fit logistic baseline over demo training matrix
-mse-ai signal             # Run signal backtest over synthetic OHLCV (APU)
-mse-ai signal GOBI        # Same for a different symbol
-```
-
-## Boundary invariant
-
-If you find yourself editing `mse_cli.core.*`, stop — that work belongs in the `mse-cli` repo, not here.
