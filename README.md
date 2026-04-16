@@ -10,6 +10,8 @@ All outputs are **deterministic, credential-free, and point-in-time safe**.
 pip install mse-ai
 ```
 
+Requires `mse-cli>=2.0.0`; earlier `mse-cli` releases do not expose the foundation SDK surfaces used by this product.
+
 ## Commands
 
 ```bash

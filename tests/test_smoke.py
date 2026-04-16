@@ -5,6 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def test_package_requires_foundation_sdk_release():
+    pyproject = Path(__file__).parents[1].joinpath("pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "0.2.0"' in pyproject
+    assert '"mse-cli>=2.0.0"' in pyproject
+
+
 def test_substrate_boundary_is_public_sdk_only():
     from mse_ai.substrate import MSEClient
 
