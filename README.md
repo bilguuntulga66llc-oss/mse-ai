@@ -22,18 +22,18 @@ mse-ai baseline APU            # Fit logistic baseline model on APU
 
 | Command | What it does |
 |---------|-------------|
-| `signal` | Runs 5 detectors (volume anomaly, price anomaly, momentum, accumulation/distribution, turnover liquidity) on real trade history |
-| `baseline` | Fits a logistic binary baseline model on real training matrix from mse-cli |
+| `signal` | Calls `MSEClient.research_signal_backtest(...)` for canonical `signal_backtest.v1` |
+| `baseline` | Calls `MSEClient.research_baseline_model_fit(...)` for canonical `baseline_model_fit.v1` |
+| `strategy` | Calls `MSEClient.research_strategy_baseline(...)` for one strategy baseline |
+| `compare` | Calls `MSEClient.research_strategy_comparison(...)` for canonical strategy ranking |
 
 ## Architecture
 
-`mse-ai` is a downstream consumer of [`mse-cli`](https://pypi.org/project/mse-cli/). It imports canonical ML substrate:
+`mse-ai` is a downstream product built on [`mse-cli`](https://pypi.org/project/mse-cli/). It has one substrate boundary:
 
-- `fit_baseline_model` — deterministic model fitting
-- `build_signal_backtest_payload` — signal evaluation
-- `detect_*` — 5 signal detectors
-- `build_walk_forward_split_plan` — walk-forward cross-validation
-- `MSEClient` — real market data (no demo data)
+- Product code imports only `MSEClient` from `mse_cli.sdk`.
+- Core detectors, model fitting, strategy ranking, schemas, and market-data adapters stay in `mse-cli`.
+- This repo owns product CLI composition only; it must not re-own `mse_cli.core.*` primitives.
 
 ## Development
 

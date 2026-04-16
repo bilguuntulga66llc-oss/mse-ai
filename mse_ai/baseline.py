@@ -1,14 +1,17 @@
-"""Baseline model training over real mse-cli substrate data.
-
-Uses the SDK to build a real training matrix from live feature/label
-surfaces and fits the canonical deterministic baseline.
-"""
+"""Baseline model training through the public mse-cli foundation SDK."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .substrate import MSEClient, fit_baseline_model
+from .substrate import MSEClient
+
+
+def _close_owned(client: Any, *, owned: bool) -> None:
+    if owned:
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
 
 
 def run_baseline_fit(
@@ -18,15 +21,18 @@ def run_baseline_fit(
     limit: int = 120,
     client: MSEClient | None = None,
 ) -> dict[str, Any]:
-    """Build a real training matrix from the SDK and fit a baseline model."""
+    """Fit a baseline model via the canonical foundation SDK surface."""
     owned = client is None
-    client = client or MSEClient()
+    c = client or MSEClient()
     try:
-        matrix = client.research_training_matrix(
+        return c.research_baseline_model_fit(
             symbol=symbol,
+            model_kind=model_kind,
             limit=limit,
+            period="ALL",
         )
     finally:
-        if owned:
-            client.close()
-    return fit_baseline_model(matrix, model_kind=model_kind)
+        _close_owned(c, owned=owned)
+
+
+__all__ = ["run_baseline_fit"]

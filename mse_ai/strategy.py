@@ -1,12 +1,4 @@
-"""Deterministic strategy backtest pipeline over real mse-cli OHLCV data.
-
-Runs the canonical strategy baselines (buy_and_hold, momentum_ma_crossover,
-mean_reversion_bollinger) against live SDK trade history and produces a
-ranked comparison payload.
-
-Every run is deterministic, credential-free, and point-in-time safe —
-those invariants come from the foundation; mse-ai just composes them.
-"""
+"""Strategy backtest pipeline through the public mse-cli foundation SDK."""
 
 from __future__ import annotations
 
@@ -14,13 +6,18 @@ from typing import Any
 
 from .substrate import MSEClient
 
-COMPARISON_SCHEMA_VERSION = "mse_ai_strategy_comparison.v1"
-
 CANONICAL_STRATEGIES: tuple[str, ...] = (
     "buy_and_hold",
     "momentum_ma_crossover",
     "mean_reversion_bollinger",
 )
+
+
+def _close_owned(client: Any, *, owned: bool) -> None:
+    if owned:
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
 
 
 def run_strategy_backtest(
@@ -35,7 +32,7 @@ def run_strategy_backtest(
     bollinger_num_std: float = 2.0,
     client: MSEClient | None = None,
 ) -> dict[str, Any]:
-    """Run a single named baseline strategy against live OHLCV data."""
+    """Run a single named baseline strategy through the foundation SDK."""
     owned = client is None
     c = client or MSEClient()
     try:
@@ -50,33 +47,7 @@ def run_strategy_backtest(
             bollinger_num_std=bollinger_num_std,
         )
     finally:
-        if owned:
-            close = getattr(c, "close", None)
-            if callable(close):
-                close()
-
-
-def _summary_row(payload: dict[str, Any]) -> dict[str, Any]:
-    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
-    return {
-        "strategy": payload.get("strategy"),
-        "final_pnl_pct": summary.get("final_pnl_pct"),
-        "max_pnl_pct": summary.get("max_pnl_pct"),
-        "min_pnl_pct": summary.get("min_pnl_pct"),
-        "max_drawdown_pct": summary.get("max_drawdown_pct"),
-        "trade_count": summary.get("trade_count"),
-        "long_bar_count": summary.get("long_bar_count"),
-        "flat_bar_count": summary.get("flat_bar_count"),
-        "bar_count": summary.get("bar_count"),
-    }
-
-
-def _sort_key(row: dict[str, Any]) -> float:
-    value = row.get("final_pnl_pct")
-    try:
-        return float(value) if value is not None else float("-inf")
-    except (TypeError, ValueError):
-        return float("-inf")
+        _close_owned(c, owned=owned)
 
 
 def compare_strategies(
@@ -87,65 +58,26 @@ def compare_strategies(
     period: str = "1Y",
     client: MSEClient | None = None,
 ) -> dict[str, Any]:
-    """Run every strategy in the catalog and rank by final P&L.
-
-    Returns a `mse_ai_strategy_comparison.v1` payload:
-    - comparison: rows sorted by final_pnl_pct descending
-    - best_strategy / worst_strategy: convenience pointers
-    - window: first/last date and bar_count from the underlying data
-    """
-    if strategies is None:
-        chosen: tuple[str, ...] = CANONICAL_STRATEGIES
-    else:
-        chosen = tuple(strategies)
-    if not chosen:
+    """Run foundation-owned strategy comparison."""
+    chosen = (
+        ()
+        if strategies is None
+        else tuple(str(item or "").strip().lower() for item in strategies if str(item or "").strip())
+    )
+    if strategies is not None and not chosen:
         raise ValueError("strategies must contain at least one baseline name")
 
     owned = client is None
     c = client or MSEClient()
     try:
-        runs: list[dict[str, Any]] = [
-            c.research_strategy_baseline(
-                symbol=symbol,
-                strategy=name,
-                limit=limit,
-                period=period,
-            )
-            for name in chosen
-        ]
+        return c.research_strategy_comparison(
+            symbol=symbol,
+            strategies=chosen,
+            limit=limit,
+            period=period,
+        )
     finally:
-        if owned:
-            close = getattr(c, "close", None)
-            if callable(close):
-                close()
-
-    rows = [_summary_row(r) for r in runs]
-    ranked = sorted(rows, key=_sort_key, reverse=True)
-
-    first_summary = runs[0].get("summary") if runs and isinstance(runs[0].get("summary"), dict) else {}
-    window = {
-        "bar_count": first_summary.get("bar_count"),
-        "first_date": first_summary.get("first_date"),
-        "last_date": first_summary.get("last_date"),
-    }
-
-    symbol_norm = str(symbol or "").strip().upper()
-    return {
-        "schema_version": COMPARISON_SCHEMA_VERSION,
-        "symbol": symbol_norm,
-        "limit": int(limit),
-        "period": str(period or "1Y").strip().upper(),
-        "window": window,
-        "strategies_evaluated": list(chosen),
-        "comparison": ranked,
-        "best_strategy": ranked[0]["strategy"] if ranked else None,
-        "worst_strategy": ranked[-1]["strategy"] if ranked else None,
-        "summary": {
-            "strategy_count": len(ranked),
-            "positive_pnl_count": sum(1 for r in ranked if _sort_key(r) > 0),
-            "negative_pnl_count": sum(1 for r in ranked if _sort_key(r) < 0),
-        },
-    }
+        _close_owned(c, owned=owned)
 
 
 def render_comparison(payload: dict[str, Any]) -> str:
@@ -186,7 +118,6 @@ def render_comparison(payload: dict[str, Any]) -> str:
 
 
 __all__ = [
-    "COMPARISON_SCHEMA_VERSION",
     "CANONICAL_STRATEGIES",
     "run_strategy_backtest",
     "compare_strategies",

@@ -1,22 +1,17 @@
-"""Signal backtest pipeline over real mse-cli trade data.
-
-Fetches real OHLCV records from the SDK, runs the canonical detector
-pipeline, and returns a `signal_backtest.v1` payload.
-"""
+"""Signal backtest pipeline through the public mse-cli foundation SDK."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .substrate import (
-    MSEClient,
-    build_signal_backtest_payload,
-    detect_accumulation_distribution,
-    detect_momentum,
-    detect_price_anomalies,
-    detect_volume_anomalies,
-    detect_turnover_liquidity_shocks,
-)
+from .substrate import MSEClient
+
+
+def _close_owned(client: Any, *, owned: bool) -> None:
+    if owned:
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
 
 
 def run_signal_backtest(
@@ -31,37 +26,19 @@ def run_signal_backtest(
     range_threshold: float = 1.0,
     client: MSEClient | None = None,
 ) -> dict[str, Any]:
-    """Fetch real trade data and run the full signal detector pipeline."""
+    """Run canonical signal backtest through the foundation SDK."""
     owned = client is None
-    client = client or MSEClient()
+    c = client or MSEClient()
     try:
-        records = client.trade_history_typed(symbol=symbol, limit=limit)
+        return c.research_signal_backtest(
+            symbol=symbol,
+            limit=limit,
+            window=window,
+            threshold=threshold,
+            period=period,
+            std_floor=std_floor,
+            adaptive_threshold=adaptive_threshold,
+            range_threshold=range_threshold,
+        )
     finally:
-        if owned:
-            client.close()
-
-    volume_rows = detect_volume_anomalies(records, window=window, threshold=threshold, min_periods=window)
-    price_rows = detect_price_anomalies(records, window=window, threshold=threshold, min_periods=window)
-    momentum_rows = detect_momentum(records, period=period)
-    accumulation_rows = detect_accumulation_distribution(
-        records, window=window, threshold=threshold, min_periods=window,
-    )
-    turnover_rows = detect_turnover_liquidity_shocks(
-        records, window=window, threshold=threshold, min_periods=window, range_threshold=range_threshold,
-    )
-    return build_signal_backtest_payload(
-        symbol=symbol,
-        records=records,
-        volume_rows=volume_rows,
-        price_rows=price_rows,
-        momentum_rows=momentum_rows,
-        accumulation_rows=accumulation_rows,
-        turnover_rows=turnover_rows,
-        limit=limit,
-        window=window,
-        threshold=threshold,
-        period=period,
-        std_floor=std_floor,
-        adaptive_threshold=adaptive_threshold,
-        range_threshold=range_threshold,
-    )
+        _close_owned(c, owned=owned)
